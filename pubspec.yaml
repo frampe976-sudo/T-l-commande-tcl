@@ -19,6 +19,8 @@ dependencies:
   shared_preferences: ^2.2.3
 
 dev_dependencies:
+  # Requis par le fichier test/ que "flutter create" genere automatiquement
+  flutter_test: {sdk: flutter}
   flutter_lints: ^4.0.0
 
 flutter:

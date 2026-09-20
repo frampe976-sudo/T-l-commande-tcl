@@ -1,0 +1,122 @@
+name: Compiler l'APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Installer Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # Le depot ne contient que pubspec.yaml et lib/main.dart. Toute
+      # l'ossature Android est generee ici, puis nos fichiers sont remis en
+      # place car "flutter create" peut les reecrire.
+      - name: Generer l'ossature Android
+        run: |
+          # Tolere main.dart envoye a la racine du depot : c'est ce que donne
+          # un envoi de fichiers depuis un telephone, ou les dossiers se perdent.
+          if [ ! -f lib/main.dart ] && [ -f main.dart ]; then
+            mkdir -p lib && mv main.dart lib/main.dart
+            echo "main.dart deplace depuis la racine vers lib/"
+          fi
+
+          mkdir -p /tmp/source
+          cp pubspec.yaml /tmp/source/
+          cp -r lib /tmp/source/
+
+          flutter create --platforms=android --project-name atv_remote .
+
+          cp /tmp/source/pubspec.yaml pubspec.yaml
+          rm -rf lib && cp -r /tmp/source/lib lib
+
+      # Flutter n'ajoute la permission INTERNET qu'aux versions de debogage.
+      # Sans cette etape, l'APK de release ne peut pas joindre la TV.
+      - name: Ajouter les permissions reseau
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          text = manifest.read_text()
+
+          permissions = [
+              "android.permission.INTERNET",
+              "android.permission.ACCESS_NETWORK_STATE",
+              "android.permission.ACCESS_WIFI_STATE",
+          ]
+          lines = [
+              f'    <uses-permission android:name="{p}" />'
+              for p in permissions if p not in text
+          ]
+
+          if lines:
+              marker = ">"
+              end = text.index(marker, text.index("<manifest")) + 1
+              text = text[:end] + "\n" + "\n".join(lines) + text[end:]
+              manifest.write_text(text)
+              print("Permissions ajoutees :", len(lines))
+          else:
+              print("Permissions deja presentes")
+
+          print(manifest.read_text())
+          PYTHON
+
+      - name: Telecharger les dependances
+        run: flutter pub get
+
+      # Ne fait echouer la compilation que sur de vraies erreurs,
+      # pas sur les avertissements de style.
+      - name: Verifier le code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Compiler l'APK
+        run: flutter build apk --release
+
+      - name: Preparer le fichier
+        run: |
+          mkdir -p sortie
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             sortie/telecommande-tv.apk
+          ls -lh sortie/
+
+      # Recuperable depuis l'onglet Actions (il faut etre connecte a GitHub)
+      - name: Publier l'APK en artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: telecommande-tv-apk
+          path: sortie/telecommande-tv.apk
+          retention-days: 90
+
+      # Recuperable en un clic depuis le navigateur du telephone
+      - name: Publier la release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: derniere-version
+          name: Telecommande TV - derniere version
+          body: |
+            APK compile automatiquement depuis le dernier envoi de code.
+
+            Telecharge `telecommande-tv.apk` ci-dessous depuis ton telephone,
+            puis ouvre le fichier pour l'installer.
+          files: sortie/telecommande-tv.apk
+          fail_on_unmatched_files: true
