@@ -1,0 +1,25 @@
+name: atv_remote
+description: "Telecommande WiFi pour TV TCL / Android TV / Google TV"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Generation du certificat client RSA auto-signe (obligatoire pour l'appairage)
+  basic_utils: ^5.8.2
+  # Types RSA, importes directement pour eviter les collisions de noms
+  pointycastle: ^3.7.3
+  # SHA-256 pour le calcul du secret d'appairage
+  crypto: ^3.0.3
+  # Memorisation du certificat et de l'IP de la TV
+  shared_preferences: ^2.2.3
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
