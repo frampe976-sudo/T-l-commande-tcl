@@ -47,7 +47,7 @@ jobs:
           flutter create --platforms=android --project-name atv_remote .
 
           cp /tmp/source/pubspec.yaml pubspec.yaml
-          rm -rf lib && cp -r /tmp/source/lib lib
+          rm -rf lib && cp -r /tmp/source/lib lib && rm -rf test
 
       # Flutter n'ajoute la permission INTERNET qu'aux versions de debogage.
       # Sans cette etape, l'APK de release ne peut pas joindre la TV.
